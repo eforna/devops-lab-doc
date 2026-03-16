@@ -1,40 +1,40 @@
-# Fase 02 — Servicios core: Gitea · Portainer · Keycloak
+# Fase 02 — Serveis core: Gitea · Portainer · Keycloak
 
-> **Objetivo**: Los tres servicios de gestión base del laboratorio operativos y accesibles vía Traefik.  
-> **Prerrequisito**: [Fase 01](../fase-01-infraestructura/README.md) completada. Traefik corriendo.
+> **Objectiu**: Els tres serveis de gestió base del laboratori operatius i accessibles via Traefik.
+> **Prerequisit**: [Fase 01](../fase-01-infraestructura/README.md) completada. Traefik en marxa.
 
-## Estado
+## Estat
 
-⬜ Pendiente
+✅ Completat
 
 ---
 
-## Snapshot antes de empezar
+## Snapshot abans de començar
 
 ```bash
-sudo snapper -c root create --description "pre-fase-02-servicios-core" --cleanup-algorithm number
+sudo /opt/devops/snapshots/snapshot.sh  # snapshot pre-fase-02-serveis-core
 ```
 
 ---
 
 ## 2.1 Gitea — Servidor Git
 
-> `gitea.devops.lab` — Alojará todos los repositorios del laboratorio, incluyendo este mismo.
+> `gitea.devops.lab` — Allotjarà tots els repositoris del laboratori, inclòs aquest mateix.
 
 ### Estructura
 
 ```
-/opt/lab/gitea/
+/opt/devops/gitea/
 ├── docker-compose.yml
-└── data/               ← persistencia (git repos, config)
+└── data/               ← persistència (git repos, config)
 ```
 
 ### `docker-compose.yml`
 
 ```bash
-mkdir -p /opt/lab/gitea/data
+mkdir -p /opt/devops/gitea
 
-cat > /opt/lab/gitea/docker-compose.yml <<'EOF'
+cat > /opt/devops/gitea/docker-compose.yml <<'EOF'
 services:
   gitea:
     image: gitea/gitea:latest
@@ -43,46 +43,65 @@ services:
     environment:
       - USER_UID=1000
       - USER_GID=1000
-      - GITEA__database__DB_TYPE=sqlite3
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=db-gitea:5432
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=${GITEA_DB_PASSWORD}
       - GITEA__server__DOMAIN=gitea.devops.lab
       - GITEA__server__ROOT_URL=http://gitea.devops.lab
       - GITEA__server__HTTP_PORT=3000
     volumes:
-      - ./data:/data
+      - /mnt/btrfs-data/gitea:/data
     networks:
-      - lab-net
+      - devops-net
+    depends_on:
+      - db-gitea
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gitea.rule=Host(`gitea.devops.lab`)"
       - "traefik.http.routers.gitea.entrypoints=web"
       - "traefik.http.services.gitea.loadbalancer.server.port=3000"
 
+  db-gitea:
+    image: postgres:15
+    container_name: db-gitea
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=gitea
+      - POSTGRES_PASSWORD=${GITEA_DB_PASSWORD}
+      - POSTGRES_DB=gitea
+    volumes:
+      - /mnt/btrfs-data/gitea-db:/var/lib/postgresql/data
+    networks:
+      - devops-net
+
 networks:
-  lab-net:
+  devops-net:
     external: true
 EOF
 ```
 
 ```bash
-cd /opt/lab/gitea
+cd /opt/devops/gitea
 docker compose up -d
 docker compose logs -f
 ```
 
-**Verificar**: `http://gitea.devops.lab` → wizard de configuración inicial.
+**Verificar**: `http://gitea.devops.lab` → wizard de configuració inicial.
 
-> ℹ️ En la primera visita completar el wizard: crear usuario admin, organización y primer repositorio `devops-lab`.
+> ℹ️ En la primera visita completar el wizard: crear usuari admin, organització i primer repositori `devops-lab`.
 
 ---
 
 ## 2.2 Portainer — UI de Docker
 
-> `portainer.devops.lab` — Gestión visual de contenedores, imágenes, volúmenes y redes.
+> `portainer.devops.lab` — Gestió visual de contenidors, imatges, volums i xarxes.
 
 ```bash
-mkdir -p /opt/lab/portainer
+mkdir -p /opt/devops/portainer
 
-cat > /opt/lab/portainer/docker-compose.yml <<'EOF'
+cat > /opt/devops/portainer/docker-compose.yml <<'EOF'
 services:
   portainer:
     image: portainer/portainer-ce:latest
@@ -92,7 +111,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
     networks:
-      - lab-net
+      - devops-net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.portainer.rule=Host(`portainer.devops.lab`)"
@@ -103,28 +122,28 @@ volumes:
   portainer_data:
 
 networks:
-  lab-net:
+  devops-net:
     external: true
 EOF
 ```
 
 ```bash
-cd /opt/lab/portainer
+cd /opt/devops/portainer
 docker compose up -d
 ```
 
-**Verificar**: `http://portainer.devops.lab` → crear usuario admin en los primeros 5 minutos.
+**Verificar**: `http://portainer.devops.lab` → crear usuari admin en els primers 5 minuts.
 
 ---
 
 ## 2.3 Keycloak — SSO / Identity Provider
 
-> `keycloak.devops.lab` — Autenticación centralizada. Más adelante integrará Gitea, Jenkins, Grafana.
+> `keycloak.devops.lab` — Autenticació centralitzada. Més endavant integrarà Gitea, Jenkins, Grafana.
 
 ```bash
-mkdir -p /opt/lab/keycloak
+mkdir -p /opt/devops/keycloak
 
-cat > /opt/lab/keycloak/docker-compose.yml <<'EOF'
+cat > /opt/devops/keycloak/docker-compose.yml <<'EOF'
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -133,12 +152,12 @@ services:
     command: start-dev
     environment:
       - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=changeme_lab   # ← cambiar
+      - KEYCLOAK_ADMIN_PASSWORD=changeme_lab   # ← canviar
       - KC_HOSTNAME=keycloak.devops.lab
       - KC_HTTP_ENABLED=true
       - KC_PROXY=edge
     networks:
-      - lab-net
+      - devops-net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.keycloak.rule=Host(`keycloak.devops.lab`)"
@@ -146,80 +165,79 @@ services:
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
 networks:
-  lab-net:
+  devops-net:
     external: true
 EOF
 ```
 
-> ⚠️ `start-dev` es para laboratorio. En producción usar `start` con base de datos externa (PostgreSQL).
+> ⚠️ `start-dev` és per a laboratori. En producció fer servir `start` amb base de dades externa (PostgreSQL).
 
 ```bash
-cd /opt/lab/keycloak
+cd /opt/devops/keycloak
 docker compose up -d
 docker compose logs -f keycloak
-# Esperar mensaje: "Keycloak ... started in"
+# Esperar missatge: "Keycloak ... started in"
 ```
 
-**Verificar**: `http://keycloak.devops.lab` → login con `admin` / `changeme_lab`.
+**Verificar**: `http://keycloak.devops.lab` → login amb `admin` / `changeme_lab`.
 
 ---
 
-## 2.4 Publicar el repositorio en Gitea
+## 2.4 Publicar el repositori a Gitea
 
-Una vez Gitea está funcionando, subir este mismo repositorio para editarlo desde VS Code / Fork:
+Un cop Gitea funciona, pujar aquest mateix repositori per editar-lo des de VS Code / Fork:
 
 ```bash
-# En el Mac — clonar desde el servidor o iniciar repo local
+# Al Mac — clonar des del servidor o iniciar repo local
 cd ~/Projects
 git init devops-lab
 cd devops-lab
 
-# Copiar ficheros markdown generados (o crearlos aquí)
+# Copiar fitxers markdown generats (o crear-los aquí)
 git add .
-git commit -m "feat: estructura inicial del laboratorio devops"
+git commit -m "feat: estructura inicial del laboratori devops"
 
-# Añadir remote Gitea
-git remote add origin http://gitea.devops.lab/<TU_USUARIO>/devops-lab.git
+# Afegir remote Gitea
+git remote add origin http://gitea.devops.lab/<EL_TEU_USUARI>/devops-lab.git
 git push -u origin main
 ```
 
 ---
 
-## 2.5 Snapshot final — punto de control "post-servicios-core"
+## 2.5 Snapshot final — punt de control "post-serveis-core"
 
 ```bash
-sudo snapper -c root create --description "post-fase-02-servicios-core" --cleanup-algorithm number
-sudo snapper -c root list
+sudo /opt/devops/snapshots/snapshot.sh  # snapshot post-fase-02-serveis-core
 ```
 
 ---
 
-## Resumen de servicios activos tras esta fase
+## Resum de serveis actius després d'aquesta fase
 
-| Servicio | URL | Usuario por defecto |
-|----------|-----|---------------------|
-| Gitea | http://gitea.devops.lab | Creado en wizard |
-| Portainer | http://portainer.devops.lab | Creado en primer acceso |
+| Servei | URL | Usuari per defecte |
+|--------|-----|--------------------|
+| Gitea | http://gitea.devops.lab | Creat al wizard |
+| Portainer | http://portainer.devops.lab | Creat en el primer accés |
 | Keycloak | http://keycloak.devops.lab | admin / changeme_lab |
 
 ---
 
-## Notas y observaciones
+## Notes i observacions
 
-| Fecha | Nota |
-|-------|------|
+| Data | Nota |
+|------|------|
 | | |
 
 ---
 
 ## Checklist de fase completada
 
-- [ ] Gitea desplegado y wizard completado
-- [ ] Repositorio `devops-lab` creado en Gitea
-- [ ] Portainer desplegado y usuario admin creado
-- [ ] Keycloak desplegado y accesible
-- [ ] Repositorio local vinculado a Gitea (Mac)
-- [ ] VS Code / Fork configurado con el repo
-- [ ] Snapshot "post-fase-02" creado
+- [x] Gitea desplegat i wizard completat
+- [x] Repositori `devops-lab` creat a Gitea
+- [x] Portainer desplegat i usuari admin creat
+- [x] Keycloak desplegat i accessible
+- [x] Repositori local vinculat a Gitea (Mac)
+- [x] VS Code / Fork configurat amb el repo
+- [x] Snapshot "post-fase-02" creat
 
-**Siguiente fase**: [Fase 03 — CI/CD con Jenkins](../fase-03-ci-cd/README.md)
+**Fase següent**: [Fase 03 — CI/CD amb Jenkins](../fase-03-ci-cd/README.md)

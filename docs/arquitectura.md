@@ -7,12 +7,10 @@ de les aplicacions i un servidor DEVOPS per desplegar i fer proves amb eines.
 
 | Equip | CPU | RAM | SSD | Hostname | IP |
 |-------|-----|-----|-----|----------|----|
-| GEEKOM IT12 I7 | Intel i7 | 32 GB | 1 TB | IT12-OKD | 192.168.1.4 |
-| GEEKOM IT12 I5 | Intel i5 | 32 GB | 1 TB | IT12-DEVOPS | 192.168.1.5 |
-| NAS Synology DS220J | — | — | 2 TB | synology | 192.168.1.2 |
 | GEEKOM IT12 I7 | Intel i7 | 32 GB | 1 TB | IT12-OKD | 192.168.2.4 |
-| GEEKOM IT12 I5 | Intel i5 | 32 GB | 1 TB | IT12-DEVOPS | 192.168.2.5 |
+| GEEKOM IT12 I7 | Intel i7 | 32 GB | 1 TB | IT12-DEVOPS | 192.168.2.5 |
 | NAS Synology DS220J | — | — | 2 TB | synology | 192.168.2.2 |
+
 
 ## Entorn de desenvolupament
 
@@ -59,7 +57,7 @@ Portainer  Gitea  Jenkins  Grafana  Keycloak  Harbor
 
 **🔐 Keycloak** — Autenticació centralitzada (SSO).
 
-**📦 Harbor** — Registry de contenidors privat. Jenkins construeix imatge → puja a Hcdarbor → OKD la descarrega.
+**📦 Harbor** — Registry de contenidors privat. Jenkins construeix imatge → puja a Harbor → OKD la descarrega.
 
 ## Flux de treball complet
 
@@ -232,8 +230,8 @@ docker network ls
 **Fitxer `/opt/devops/.env`:**
 
 ```env
-SERVER_IP=192.168.1.5
-DOMAIN=devops.net
+SERVER_IP=192.168.2.5
+DOMAIN=devops.lab
 BTRFS_DATA=/mnt/btrfs-data
 ADMIN_USER=admin
 ADMIN_PASSWORD=B1ny2l3s@
@@ -268,7 +266,7 @@ services:
       - devops-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.devops.net`)"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.devops.lab`)"
       - "traefik.http.routers.dashboard.service=api@internal"
 
 networks:
@@ -302,7 +300,7 @@ services:
       - devops-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host(`portainer.devops.net`)"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.devops.lab`)"
       - "traefik.http.routers.portainer.entrypoints=web"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
@@ -325,7 +323,7 @@ sudo rm -rf /mnt/btrfs-data/portainer/*
 docker compose up -d
 ```
 
-Accedir **immediatament** a `http://portainer.devops.net` i crear usuari `admin / B1ny2l3s@`.
+Accedir **immediatament** a `http://portainer.devops.lab` i crear usuari `admin / B1ny2l3s@`.
 Després: "Get Started" → "local".
 
 ---
@@ -344,9 +342,9 @@ services:
       - USER_UID=1000
       - USER_GID=1000
       - GITEA__database__DB_TYPE=sqlite3
-      - GITEA__server__DOMAIN=gitea.devops.net
-      - GITEA__server__ROOT_URL=http://gitea.devops.net
-      - GITEA__server__SSH_DOMAIN=192.168.1.5
+      - GITEA__server__DOMAIN=gitea.devops.lab
+      - GITEA__server__ROOT_URL=http://gitea.devops.lab
+      - GITEA__server__SSH_DOMAIN=192.168.2.5
       - GITEA__server__SSH_PORT=222
     volumes:
       - /mnt/btrfs-data/gitea:/data
@@ -356,7 +354,7 @@ services:
       - devops-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.gitea.rule=Host(`gitea.devops.net`)"
+      - "traefik.http.routers.gitea.rule=Host(`gitea.devops.lab`)"
       - "traefik.http.routers.gitea.entrypoints=web"
       - "traefik.http.services.gitea.loadbalancer.server.port=3000"
 
@@ -371,7 +369,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Accedir a `http://gitea.devops.net` i completar la configuració inicial:
+Accedir a `http://gitea.devops.lab` i completar la configuració inicial:
 Database=SQLite3, Admin=admin, Password=B1ny2l3s@, Email=efornaguera@gmail.com.
 
 ### 💬 Dubte: En els logs veiem `0.0.0.0:3000`
@@ -390,12 +388,12 @@ Des d'IT12-DEVOPS: ping per IP o nom del contenidor. Des del MacBook: no és acc
 
 ### 💬 Dubte: Es pot canviar el nom del domini?
 
-Sí! S'ha configurat el NAS Synology DS220J com a servidor DNS local amb zona `devops.net`.
+Sí! S'ha configurat el NAS Synology DS220J com a servidor DNS local amb zona `devops.lab`.
 
 ```bash
 # Canvi massiu de domini a tots els docker-compose
-sed -i 's/192.168.1.5.nip.io/devops.net/g' /opt/devops/*/docker-compose.yml
-grep -r 'devops.net' /opt/devops/*/docker-compose.yml
+sed -i 's/192.168.1.5.nip.io/devops.lab/g' /opt/devops/*/docker-compose.yml
+grep -r 'devops.lab' /opt/devops/*/docker-compose.yml
 
 # Reiniciar tots els serveis
 for svc in traefik portainer gitea jenkins grafana keycloak; do
@@ -425,7 +423,7 @@ services:
       - devops-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.jenkins.rule=Host(`jenkins.devops.net`)"
+      - "traefik.http.routers.jenkins.rule=Host(`jenkins.devops.lab`)"
       - "traefik.http.routers.jenkins.entrypoints=web"
       - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
 
@@ -440,7 +438,7 @@ docker compose up -d
 docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
-Accedir a `http://jenkins.devops.net`, introduir la clau inicial, instal·lar plugins suggerits.
+Accedir a `http://jenkins.devops.lab`, introduir la clau inicial, instal·lar plugins suggerits.
 
 **Crear usuari admin:** Username=admin, Password=B1ny2l3s@, Email=admin@it12-devops.local
 
@@ -470,8 +468,8 @@ pipeline {
     agent any
     tools { maven 'Maven-3.9'; jdk 'JDK-21' }
     environment {
-        GITEA_URL = 'http://gitea.devops.net'
-        HARBOR_URL = 'harbor.devops.net:8888'
+        GITEA_URL = 'http://gitea.devops.lab'
+        HARBOR_URL = 'harbor.devops.lab:8888'
         APP_NAME = 'myapp'
     }
     stages {
@@ -509,7 +507,7 @@ pipeline {
 ### Configurar Webhook Gitea → Jenkins
 
 **Jenkins:** New Item → Multibranch Pipeline → Branch Sources → Gitea  
-**Gitea:** Repositori → Settings → Webhooks → `http://jenkins.devops.net/gitea-webhook/post`
+**Gitea:** Repositori → Settings → Webhooks → `http://jenkins.devops.lab/gitea-webhook/post`
 
 ---
 
@@ -530,7 +528,7 @@ services:
       - devops-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.devops.net`)"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.devops.lab`)"
       - "traefik.http.routers.prometheus.entrypoints=web"
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
 
@@ -548,7 +546,7 @@ services:
       - devops-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.devops.net`)"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.devops.lab`)"
       - "traefik.http.routers.grafana.entrypoints=web"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
@@ -569,10 +567,10 @@ scrape_configs:
       - targets: ["prometheus:9090"]
   - job_name: "docker"
     static_configs:
-      - targets: ["192.168.1.5:9323"]
+      - targets: ["192.168.2.5:9323"]
   - job_name: "node"
     static_configs:
-      - targets: ["192.168.1.5:9100"]
+      - targets: ["192.168.2.5:9100"]
     - job_name: "docker"
       static_configs:
         - targets: ["192.168.2.5:9323"]
@@ -589,8 +587,8 @@ docker compose ps
 
 | Servei | URL | Credencials |
 |--------|-----|-------------|
-| Grafana | http://grafana.devops.net | admin / B1ny2l3s@ |
-| Prometheus | http://prometheus.devops.net | — |
+| Grafana | http://grafana.devops.lab | admin / B1ny2l3s@ |
+| Prometheus | http://prometheus.devops.lab | — |
 
 ### ⚠️ Error: Grafana — permisos (usuari 472)
 
@@ -625,7 +623,7 @@ services:
       - KEYCLOAK_ADMIN_PASSWORD=B1ny2l3s@
       - KC_PROXY=edge
       - KC_HTTP_ENABLED=true
-      - KC_HOSTNAME=keycloak.devops.net
+      - KC_HOSTNAME=keycloak.devops.lab
       - KC_HOSTNAME_STRICT=false
     command: start-dev
     volumes:
@@ -634,7 +632,7 @@ services:
       - devops-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.keycloak.rule=Host(`keycloak.devops.net`)"
+      - "traefik.http.routers.keycloak.rule=Host(`keycloak.devops.lab`)"
       - "traefik.http.routers.keycloak.entrypoints=web"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
@@ -649,7 +647,7 @@ docker compose up -d
 docker compose logs -f  # triga 1-2 minuts
 ```
 
-Accedir a `http://keycloak.devops.net` amb `admin / B1ny2l3s@`.
+Accedir a `http://keycloak.devops.lab` amb `admin / B1ny2l3s@`.
 
 ### ⚠️ Error: Keycloak — permisos H2 (usuari 1000)
 
@@ -680,7 +678,7 @@ nano harbor.yml
 Configuració mínima al `harbor.yml`:
 
 ```yaml
-hostname: harbor.devops.net
+hostname: harbor.devops.lab
 http:
   port: 8888
 harbor_admin_password: B1ny2l3s@
@@ -694,14 +692,14 @@ sudo ./install.sh
 docker compose ps
 ```
 
-Accedir a `http://harbor.devops.net:8888` amb `admin / B1ny2l3s@`.
+Accedir a `http://harbor.devops.lab:8888` amb `admin / B1ny2l3s@`.
 
 **Configurar Traefik per Harbor** — afegir labels al servei proxy de Harbor:
 
 ```yaml
 labels:
   - "traefik.enable=true"
-  - "traefik.http.routers.harbor.rule=Host(`harbor.devops.net`)"
+  - "traefik.http.routers.harbor.rule=Host(`harbor.devops.lab`)"
   - "traefik.http.routers.harbor.entrypoints=web"
   - "traefik.http.services.harbor.loadbalancer.server.port=8888"
 ```
@@ -721,14 +719,14 @@ sudo ./install.sh 2>&1 | tee install.log
 
 | Servei | URL | Credencials |
 |--------|-----|-------------|
-| Traefik | http://traefik.devops.net | — |
-| Portainer | http://portainer.devops.net | admin / B1ny2l3s@ |
-| Gitea | http://gitea.devops.net | admin / B1ny2l3s@ |
-| Jenkins | http://jenkins.devops.net | admin / B1ny2l3s@ |
-| Grafana | http://grafana.devops.net | admin / B1ny2l3s@ |
-| Prometheus | http://prometheus.devops.net | — |
-| Keycloak | http://keycloak.devops.net | admin / B1ny2l3s@ |
-| Harbor | http://harbor.devops.net:8888 | admin / B1ny2l3s@ |
+| Traefik | http://traefik.devops.lab | — |
+| Portainer | http://portainer.devops.lab | admin / B1ny2l3s@ |
+| Gitea | http://gitea.devops.lab | admin / B1ny2l3s@ |
+| Jenkins | http://jenkins.devops.lab | admin / B1ny2l3s@ |
+| Grafana | http://grafana.devops.lab | admin / B1ny2l3s@ |
+| Prometheus | http://prometheus.devops.lab | — |
+| Keycloak | http://keycloak.devops.lab | admin / B1ny2l3s@ |
+| Harbor | http://harbor.devops.lab:8888 | admin / B1ny2l3s@ |
 
 ### Estat del projecte
 
@@ -751,7 +749,7 @@ sudo ./install.sh 2>&1 | tee install.log
 
 | Projecte | Descripció |
 |----------|-------------|
-| IT12-OKD | Instal·lar OKD Baremetal a Fedora (192.168.1.4) |
+| IT12-OKD | Instal·lar OKD Baremetal a Fedora (192.168.2.4) |
 | Pipeline | Primer pipeline Jenkins → Gitea → Harbor → OKD |
 | Monitoring | Dashboards Grafana per monitoritzar tot el lab |
 | SSO | Integrar Keycloak amb tots els serveis |

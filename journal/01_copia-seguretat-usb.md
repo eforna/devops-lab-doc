@@ -1,11 +1,11 @@
 # Còpia de seguretat IT12 amb USB d'arrancada
 
-## Usar otro PC Windows
+## Usar un altre PC Windows
 
-Si tienes acceso a cualquier PC Windows:
+Si tens accés a qualsevol PC Windows:
 
-- Instala Macrium Reflect Free.
-- Conecta el pendrive.
+- Instal·la Macrium Reflect Free.
+- Connecta el pendrive.
 - Crea el Rescue Media.
 
 ## Descarregar Macrium Reflect Home (30 dies de Free)

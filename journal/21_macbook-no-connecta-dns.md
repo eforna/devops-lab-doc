@@ -6,7 +6,7 @@
 
 ## Problema
 
-El MacBook no resolvia els dominis del lab (`*.devops.net`, `*.okd.devops.net`).
+El MacBook no resolvia els dominis del lab (`*.devops.lab`, `*.okd.devops.lab`).
 
 ---
 
@@ -21,39 +21,39 @@ scutil --dns | grep nameserver
 **Resultat:**
 
 ```
-nameserver[0] : 192.168.1.2
+nameserver[0] : 192.168.2.2
 nameserver[1] : 8.8.8.8
 nameserver[2] : 1.1.1.1
 ```
 
-✅ El DNS estava ben configurat. El MacBook ja apuntava al Synology (`192.168.1.2`).
+✅ El DNS estava ben configurat. El MacBook ja apuntava al Synology (`192.168.2.2`).
 
 ### 2. Verificar resolució DNS directa al Synology
 
 ```bash
-nslookup api.okd.devops.net 192.168.1.2
+nslookup api.okd.devops.lab 192.168.2.2
 ```
 
 **Resultat:**
 
 ```
-Server:         192.168.1.2
-Address:        192.168.1.2#53
+Server:         192.168.2.2
+Address:        192.168.2.2#53
 
-Name:   api.okd.devops.net
-Address: 192.168.1.4
+Name:   api.okd.devops.lab
+Address: 192.168.2.4
 ```
 
-✅ Resol correctament a `192.168.1.4`.
+✅ Resol correctament a `192.168.2.4`.
 
 ---
 
 ## Causa arrel
 
-El MacBook estava connectat pel **USB-C Dock Ethernet**, però el DNS `192.168.1.2` només estava configurat a la interfície **Wi-Fi**.
+El MacBook estava connectat pel **USB-C Dock Ethernet**, però el DNS `192.168.2.2` només estava configurat a la interfície **Wi-Fi**.
 
-- `Wi-Fi` → DNS `192.168.1.2` ✅ (correcte però no usada)
-- `USB-C Dock Ethernet` → DNS del router `192.168.1.1` ❌ (no coneix `devops.net`)
+- `Wi-Fi` → DNS `192.168.2.2` ✅ (correcte però no usada)
+- `USB-C Dock Ethernet` → DNS del router `192.168.1.1` ❌ (no coneix `devops.lab`)
 
 macOS usa la interfície amb prioritat més alta. El Dock Ethernet apareix primer a la llista de serveis, per tant les seves consultes DNS anaven al router i no resolien els dominis del lab.
 
@@ -62,12 +62,12 @@ macOS usa la interfície amb prioritat més alta. El Dock Ethernet apareix prime
 ## Solució aplicada
 
 ```bash
-sudo networksetup -setdnsservers "USB-C Dock Ethernet" 192.168.1.2 8.8.8.8
+sudo networksetup -setdnsservers "USB-C Dock Ethernet" 192.168.2.2 8.8.8.8
 sudo dscacheutil -flushcache
 sudo killall -HUP mDNSResponder
 ```
 
-✅ `ping gitea.devops.net` resol correctament.
+✅ `ping gitea.devops.lab` resol correctament.
 
 ---
 
@@ -78,7 +78,7 @@ sudo killall -HUP mDNSResponder
 Si en algun moment es perd (p. ex. canvi de xarxa), re-aplicar:
 
 ```bash
-sudo networksetup -setdnsservers "USB-C Dock Ethernet" 192.168.1.2 8.8.8.8
+sudo networksetup -setdnsservers "USB-C Dock Ethernet" 192.168.2.2 8.8.8.8
 sudo dscacheutil -flushcache
 sudo killall -HUP mDNSResponder
 ```
@@ -89,10 +89,10 @@ sudo killall -HUP mDNSResponder
 
 | Interfície | DNS configurat | Funciona |
 |------------|---------------|----------|
-| Wi-Fi | `192.168.1.2`, `8.8.8.8` | ✅ |
-| USB-C Dock Ethernet | `192.168.1.2`, `8.8.8.8` | ✅ |
-| `ping gitea.devops.net` | — | ✅ |
-| `nslookup api.okd.devops.net` | — | ✅ |
+| Wi-Fi | `192.168.2.2`, `8.8.8.8` | ✅ |
+| USB-C Dock Ethernet | `192.168.2.2`, `8.8.8.8` | ✅ |
+| `ping gitea.devops.lab` | — | ✅ |
+| `nslookup api.okd.devops.lab` | — | ✅ |
 
 ---
 
@@ -150,7 +150,7 @@ Si el domini resol però el certificat és autosignat, Chrome mostra error de co
 4. Prova en mode incògnit sense extensions
 5. Si tot falla → problema de certificat, no de DNS
 
-| Navegador | Resol `*.devops.net` |
+| Navegador | Resol `*.devops.lab` |
 |-----------|----------------------|
 | Safari | ✅ |
 | Chrome | ❌ (causa pendent de confirmar) |
@@ -169,7 +169,7 @@ Si el domini resol però el certificat és autosignat, Chrome mostra error de co
 
 ### Per què `.net` tampoc és ideal
 
-`.net` és un TLD públic real. Quan el DNS segur de Chrome no troba resposta local, pot intentar consultar servidors externs, que evidentment no coneixen el teu `devops.net` privat.
+`.net` és un TLD públic real. Quan el DNS segur de Chrome no troba resposta local, pot intentar consultar servidors externs, que evidentment no coneixen el teu `devops.lab` privat.
 
 ### Recomanació: usar un TLD reservat per xarxes privades
 
@@ -215,7 +215,7 @@ console.okd.devops.lan
 
 **Passos per a la migració:**
 
-1. Actualitzar les zones DNS al Synology (`devops.net` → `devops.lan`)
+1. Actualitzar les zones DNS al Synology (`devops.lab` → `devops.lan`)
 2. Actualitzar la configuració de Traefik (routers i certificats)
 3. Actualitzar les referències als serveis (OKD, Gitea, etc.)
 4. Actualitzar el DNS del MacBook (si cal, ja apunta al Synology)

@@ -1,20 +1,20 @@
 # Auditoria de les Còpies de Seguretat
 
 **Data auditoria:** 09/03/2026
-**Servidor auditat:** IT12-DEVOPS (192.168.1.5)
+**Servidor auditat:** IT12-DEVOPS (192.168.2.5)
 **Destí backup:** NAS Synology DS220J → `/volume1/backup/it12-devops/`
 
 ---
 
 ## 1. Localització dels scripts de backup
 
-Tots els scripts es troben al servidor **IT12-DEVOPS (192.168.1.5)**:
+Tots els scripts es troben al servidor **IT12-DEVOPS (192.168.2.5)**:
 
 ```
-/opt/devops/backup.sh               ← Backup setmanal complet al NAS
-/opt/devops/backup_snapshots.sh     ← Backup diari dels snapshots BTRFS al NAS
-/opt/devops/snapshot.sh             ← Snapshots BTRFS locals diaris
-/opt/devops/restore-snapshot.sh     ← Script de restauració manual
+/opt/devops/backup/backup.sh               ← Backup setmanal complet al NAS
+/opt/devops/backup/backup_snapshots.sh     ← Backup diari dels snapshots BTRFS al NAS
+/opt/devops/snapshots/snapshot.sh             ← Snapshots BTRFS locals diaris
+/opt/devops/snapshots/restore-snapshot.sh     ← Script de restauració manual
 ```
 
 ---

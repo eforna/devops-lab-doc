@@ -1,31 +1,31 @@
 # Fase 04 — Container Registry: Harbor
 
-> **Objetivo**: Harbor operativo como registry privado de imágenes Docker, integrado con Jenkins para push/pull automático.  
-> **Prerrequisito**: [Fase 03](../fase-03-ci-cd/README.md) completada.
+> **Objectiu**: Harbor operatiu com a registry privat d'imatges Docker, integrat amb Jenkins per a push/pull automàtic.
+> **Prerequisit**: [Fase 03](../fase-03-ci-cd/README.md) completada.
 
-## Estado
+## Estat
 
-⬜ Pendiente
+✅ Completat
 
 ---
 
-## Snapshot antes de empezar
+## Snapshot abans de començar
 
 ```bash
-sudo snapper -c root create --description "pre-fase-04-harbor" --cleanup-algorithm number
+sudo /opt/devops/snapshots/snapshot.sh pre-fase-04-harbor
 ```
 
 ---
 
-## 4.1 Descargar Harbor installer
+## 4.1 Descarregar l'instal·lador de Harbor
 
-Harbor requiere su propio instalador (no es una imagen Docker simple):
+Harbor requereix el seu propi instal·lador (no és una imatge Docker simple):
 
 ```bash
-# Descargar la última versión
-cd /opt/lab
+# Descarregar l'última versió
+cd /opt/devops
 HARBOR_VERSION=$(curl -s https://api.github.com/repos/goharbor/harbor/releases/latest | jq -r .tag_name)
-echo "Versión: $HARBOR_VERSION"
+echo "Versió: $HARBOR_VERSION"
 
 curl -LO "https://github.com/goharbor/harbor/releases/download/${HARBOR_VERSION}/harbor-online-installer-${HARBOR_VERSION}.tgz"
 tar xvf harbor-online-installer-*.tgz
@@ -43,77 +43,77 @@ cp harbor.yml.tmpl harbor.yml
 Editar `harbor.yml`:
 
 ```yaml
-# Cambiar estas líneas:
+# Canviar aquestes línies:
 hostname: harbor.devops.lab
 
-# Comentar la sección https (usamos HTTP en lab)
+# Comentar la secció https (usem HTTP al lab)
 # https:
 #   port: 443
 #   ...
 
-harbor_admin_password: changeme_lab   # ← cambiar
+harbor_admin_password: changeme_lab   # ← canviar
 
-# Directorio de datos
-data_volume: /opt/lab/harbor/data
+# Directori de dades
+data_volume: /mnt/btrfs-data/harbor
 ```
 
 ```bash
-mkdir -p /opt/lab/harbor/data
+mkdir -p /mnt/btrfs-data/harbor
 ```
 
 ---
 
-## 4.3 Instalar Harbor
+## 4.3 Instal·lar Harbor
 
 ```bash
-cd /opt/lab/harbor
+cd /opt/devops/harbor
 sudo ./install.sh
 
-# Harbor levanta sus propios contenedores con docker compose
-# Ver estado
+# Harbor aixeca els seus propis contenidors amb docker compose
+# Veure estat
 docker compose ps
 ```
 
 ---
 
-## 4.4 Exponer Harbor con Traefik
+## 4.4 Exposar Harbor amb Traefik
 
-Harbor usa su propio `docker-compose.yml`. Añadir labels de Traefik al servicio `nginx` de Harbor:
+Harbor usa el seu propi `docker-compose.yml`. Afegir labels de Traefik al servei `nginx` de Harbor:
 
 ```bash
-# Editar docker-compose.yml generado por Harbor
-# Buscar el servicio "nginx" y añadir:
+# Editar docker-compose.yml generat per Harbor
+# Buscar el servei "nginx" i afegir:
 ```
 
 ```yaml
-# En el servicio nginx de Harbor:
+# Al servei nginx de Harbor:
 labels:
   - "traefik.enable=true"
   - "traefik.http.routers.harbor.rule=Host(`harbor.devops.lab`)"
   - "traefik.http.routers.harbor.entrypoints=web"
-  - "traefik.http.services.harbor.loadbalancer.server.port=8080"
+  - "traefik.http.services.harbor.loadbalancer.server.port=8888"
 networks:
-  - lab-net
-  - harbor_harbor   # red interna de harbor
+  - devops-net
+  - harbor_harbor   # xarxa interna de harbor
 ```
 
 ```bash
-# Asegurarse que lab-net es externa en docker-compose.yml de Harbor
-# Añadir al final del fichero:
+# Assegurar-se que devops-net és externa al docker-compose.yml de Harbor
+# Afegir al final del fitxer:
 # networks:
-#   lab-net:
+#   devops-net:
 #     external: true
 
 docker compose down && docker compose up -d
 ```
 
-**Verificar**: `http://harbor.devops.lab` → login con `admin` / `changeme_lab`.
+**Verificar**: `http://harbor.devops.lab:8888` → login amb `admin` / `changeme_lab`.
 
 ---
 
-## 4.5 Configurar Docker para usar Harbor
+## 4.5 Configurar Docker per usar Harbor
 
-Harbor sin HTTPS requiere marcarlo como "insecure registry":
+Harbor sense HTTPS requereix marcar-lo com a "insecure registry":
 
 ```bash
 sudo tee -a /etc/docker/daemon.json <<'EOF'
@@ -125,18 +125,18 @@ EOF
 sudo systemctl restart docker
 ```
 
-**Probar login**:
+**Provar login**:
 ```bash
 docker login harbor.devops.lab
-# Usuario: admin
-# Password: changeme_lab
+# Usuari: admin
+# Contrasenya: changeme_lab
 ```
 
 ---
 
-## 4.6 Crear proyecto en Harbor
+## 4.6 Crear projecte a Harbor
 
-En la UI de Harbor:
+A la UI de Harbor:
 ```
 Projects → New Project
 → Name: devops-lab
@@ -145,20 +145,20 @@ Projects → New Project
 
 ---
 
-## 4.7 Push de primera imagen de prueba
+## 4.7 Push de la primera imatge de prova
 
 ```bash
-# Etiquetar imagen local para Harbor
+# Etiquetar imatge local per a Harbor
 docker pull alpine
 docker tag alpine harbor.devops.lab/devops-lab/alpine:test
 docker push harbor.devops.lab/devops-lab/alpine:test
 
-# Verificar en la UI de Harbor
+# Verificar a la UI de Harbor
 ```
 
 ---
 
-## 4.8 Integrar Harbor en Jenkins
+## 4.8 Integrar Harbor a Jenkins
 
 ```
 Manage Jenkins → Credentials → Add
@@ -168,7 +168,7 @@ Manage Jenkins → Credentials → Add
 → ID: harbor-credentials
 ```
 
-Ejemplo en Jenkinsfile:
+Exemple a Jenkinsfile:
 ```groovy
 stage('Push to Harbor') {
     steps {
@@ -192,29 +192,29 @@ stage('Push to Harbor') {
 ## 4.9 Snapshot final
 
 ```bash
-sudo snapper -c root create --description "post-fase-04-harbor" --cleanup-algorithm number
+sudo /opt/devops/snapshots/snapshot.sh post-fase-04-harbor
 ```
 
 ---
 
-## Notas y observaciones
+## Notes i observacions
 
-| Fecha | Nota |
-|-------|------|
+| Data | Nota |
+|------|------|
 | | |
 
 ---
 
 ## Checklist de fase completada
 
-- [ ] Harbor descargado e instalado
-- [ ] `harbor.yml` configurado con dominio y contraseña
-- [ ] Harbor accesible vía Traefik en `harbor.devops.lab`
-- [ ] Docker configurado con insecure-registry
-- [ ] Login Docker a Harbor funcionando
-- [ ] Proyecto `devops-lab` creado en Harbor
-- [ ] Primera imagen pusheada correctamente
-- [ ] Credenciales Harbor en Jenkins
-- [ ] Snapshot "post-fase-04" creado
+- [x] Harbor descarregat i instal·lat
+- [x] `harbor.yml` configurat amb domini i contrasenya
+- [x] Harbor accessible via Traefik a `harbor.devops.lab`
+- [x] Docker configurat amb insecure-registry
+- [x] Login Docker a Harbor funcionant
+- [x] Projecte `devops-lab` creat a Harbor
+- [x] Primera imatge pujada correctament
+- [x] Credencials Harbor a Jenkins
+- [x] Snapshot "post-fase-04" creat
 
-**Siguiente fase**: [Fase 05 — Monitorización](../fase-05-monitoring/README.md)
+**Fase següent**: [Fase 05 — Monitorització](../fase-05-monitoring/README.md)

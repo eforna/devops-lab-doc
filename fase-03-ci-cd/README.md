@@ -1,18 +1,18 @@
 # Fase 03 — CI/CD: Jenkins
 
-> **Objetivo**: Jenkins operativo, integrado con Gitea mediante webhooks y capaz de ejecutar pipelines sobre contenedores Docker.  
-> **Prerrequisito**: [Fase 02](../fase-02-servicios-core/README.md) completada. Gitea funcionando.
+> **Objectiu**: Jenkins operatiu, integrat amb Gitea mitjançant webhooks i capaç d'executar pipelines sobre contenidors Docker.
+> **Prerequisit**: [Fase 02](../fase-02-servicios-core/README.md) completada. Gitea funcionant.
 
-## Estado
+## Estat
 
-⬜ Pendiente
+✅ Completat
 
 ---
 
-## Snapshot antes de empezar
+## Snapshot abans de començar
 
 ```bash
-sudo snapper -c root create --description "pre-fase-03-jenkins" --cleanup-algorithm number
+sudo /opt/devops/snapshots/snapshot.sh  # snapshot pre-fase-03-jenkins
 ```
 
 ---
@@ -20,24 +20,24 @@ sudo snapper -c root create --description "pre-fase-03-jenkins" --cleanup-algori
 ## 3.1 Desplegar Jenkins
 
 ```bash
-mkdir -p /opt/lab/jenkins/data
-sudo chown -R 1000:1000 /opt/lab/jenkins/data
+mkdir -p /opt/devops/jenkins
+sudo chown -R 1000:1000 /opt/devops/jenkins
 
-cat > /opt/lab/jenkins/docker-compose.yml <<'EOF'
+cat > /opt/devops/jenkins/docker-compose.yml <<'EOF'
 services:
   jenkins:
     image: jenkins/jenkins:lts
     container_name: jenkins
     restart: unless-stopped
-    user: root                      # Para acceder al socket Docker
+    user: root                      # Per accedir al socket Docker
     environment:
       - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
     volumes:
-      - ./data:/var/jenkins_home
+      - /mnt/btrfs-data/jenkins:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker
     networks:
-      - lab-net
+      - devops-net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.jenkins.rule=Host(`jenkins.devops.lab`)"
@@ -45,64 +45,64 @@ services:
       - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
 
 networks:
-  lab-net:
+  devops-net:
     external: true
 EOF
 ```
 
 ```bash
-cd /opt/lab/jenkins
+cd /opt/devops/jenkins
 docker compose up -d
 
-# Obtener contraseña inicial de administrador
+# Obtenir contrasenya inicial d'administrador
 docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
-**Verificar**: `http://jenkins.devops.lab` → usar la contraseña obtenida.
+**Verificar**: `http://jenkins.devops.lab` → fer servir la contrasenya obtinguda.
 
 ---
 
-## 3.2 Configuración inicial Jenkins
+## 3.2 Configuració inicial Jenkins
 
-En la UI de Jenkins:
+A la UI de Jenkins:
 
-1. Instalar plugins sugeridos
-2. Crear usuario administrador
-3. Instalar plugins adicionales:
-   - **Gitea** (integración nativa)
+1. Instal·lar plugins suggerits
+2. Crear usuari administrador
+3. Instal·lar plugins addicionals:
+   - **Gitea** (integració nativa)
    - **Docker Pipeline**
    - **Blue Ocean** (UI moderna, opcional)
 
 ```
 Manage Jenkins → Plugins → Available plugins
-→ Buscar: "Gitea", "Docker Pipeline"
+→ Cercar: "Gitea", "Docker Pipeline"
 → Install without restart
 ```
 
 ---
 
-## 3.3 Conectar Jenkins con Gitea
+## 3.3 Connectar Jenkins amb Gitea
 
-### En Gitea: crear token de acceso
+### A Gitea: crear token d'accés
 
 ```
 Gitea → Settings → Applications → Generate Token
-→ Nombre: jenkins-token
+→ Nom: jenkins-token
 → Permisos: repo (read/write), webhooks
-→ Copiar el token generado
+→ Copiar el token generat
 ```
 
-### En Jenkins: añadir credencial
+### A Jenkins: afegir credencial
 
 ```
 Manage Jenkins → Credentials → Global → Add Credentials
 → Kind: Username with password
-→ Username: <tu_usuario_gitea>
-→ Password: <token_generado>
+→ Username: <el_teu_usuari_gitea>
+→ Password: <token_generat>
 → ID: gitea-credentials
 ```
 
-### En Jenkins: configurar servidor Gitea
+### A Jenkins: configurar servidor Gitea
 
 ```
 Manage Jenkins → System → Gitea Servers → Add
@@ -113,12 +113,12 @@ Manage Jenkins → System → Gitea Servers → Add
 
 ---
 
-## 3.4 Primer pipeline de prueba
+## 3.4 Primer pipeline de prova
 
-Crear repositorio de prueba en Gitea con un `Jenkinsfile`:
+Crear repositori de prova a Gitea amb un `Jenkinsfile`:
 
 ```groovy
-// Jenkinsfile de ejemplo
+// Jenkinsfile d'exemple
 pipeline {
     agent any
 
@@ -135,31 +135,31 @@ pipeline {
         }
         stage('Test') {
             steps {
-                sh 'echo "Tests pasados"'
+                sh 'echo "Tests passats"'
             }
         }
         stage('Deploy') {
             steps {
-                sh 'echo "Deploy simulado"'
+                sh 'echo "Deploy simulat"'
             }
         }
     }
 
     post {
         always {
-            echo "Pipeline finalizado: ${currentBuild.result}"
+            echo "Pipeline finalitzat: ${currentBuild.result}"
         }
     }
 }
 ```
 
-### Crear job en Jenkins
+### Crear job a Jenkins
 
 ```
 New Item → Pipeline
 → Pipeline script from SCM
 → SCM: Git
-→ Repository URL: http://gitea.devops.lab/<usuario>/test-pipeline.git
+→ Repository URL: http://gitea.devops.lab/<usuari>/test-pipeline.git
 → Credentials: gitea-credentials
 → Branch: */main
 ```
@@ -168,7 +168,7 @@ New Item → Pipeline
 
 ## 3.5 Configurar webhook Gitea → Jenkins
 
-En Gitea, en el repositorio:
+A Gitea, al repositori:
 
 ```
 Settings → Webhooks → Add Webhook → Gitea
@@ -177,34 +177,34 @@ Settings → Webhooks → Add Webhook → Gitea
 → Active: ✓
 ```
 
-Test del webhook → debe devolver HTTP 200.
+Test del webhook → ha de retornar HTTP 200.
 
 ---
 
 ## 3.6 Snapshot final
 
 ```bash
-sudo snapper -c root create --description "post-fase-03-jenkins" --cleanup-algorithm number
+sudo /opt/devops/snapshots/snapshot.sh  # snapshot post-fase-03-jenkins
 ```
 
 ---
 
-## Notas y observaciones
+## Notes i observacions
 
-| Fecha | Nota |
-|-------|------|
+| Data | Nota |
+|------|------|
 | | |
 
 ---
 
 ## Checklist de fase completada
 
-- [ ] Jenkins desplegado y accesible
-- [ ] Plugins instalados (Gitea, Docker Pipeline)
-- [ ] Token Gitea creado y credencial añadida en Jenkins
-- [ ] Servidor Gitea configurado en Jenkins
-- [ ] Primer pipeline ejecutado con éxito
-- [ ] Webhook Gitea → Jenkins funcionando
-- [ ] Snapshot "post-fase-03" creado
+- [x] Jenkins desplegat i accessible
+- [x] Plugins instal·lats (Gitea, Docker Pipeline)
+- [x] Token Gitea creat i credencial afegida a Jenkins
+- [x] Servidor Gitea configurat a Jenkins
+- [x] Primer pipeline executat amb èxit
+- [x] Webhook Gitea → Jenkins funcionant
+- [x] Snapshot "post-fase-03" creat
 
-**Siguiente fase**: [Fase 04 — Registry con Harbor](../fase-04-registry/README.md)
+**Fase següent**: [Fase 04 — Registry amb Harbor](../fase-04-registry/README.md)

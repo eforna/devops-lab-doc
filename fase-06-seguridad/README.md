@@ -1,35 +1,35 @@
-# Fase 06 — Seguridad y hardening
+# Fase 06 — Seguretat i hardening
 
-> **Objetivo**: Firewall configurado, accesos mínimos, certificados TLS internos con mkcert, contraseñas por defecto eliminadas.  
-> **Prerrequisito**: Todas las fases anteriores completadas y estables.
+> **Objectiu**: Firewall configurat, accessos mínims, certificats TLS interns amb mkcert, contrasenyes per defecte eliminades.
+> **Prerequisit**: Totes les fases anteriors completades i estables.
 
-## Estado
+## Estat
 
-⬜ Pendiente
+🔄 En progrés
 
 ---
 
-## Snapshot antes de empezar
+## Snapshot abans de començar
 
 ```bash
-sudo snapper -c root create --description "pre-fase-06-seguridad" --cleanup-algorithm number
+sudo /opt/devops/snapshots/snapshot.sh pre-fase-06-seguritat
 ```
 
 ---
 
-## 6.1 Firewall con UFW
+## 6.1 Firewall amb UFW
 
 ```bash
 sudo apt install -y ufw
 
-# Política por defecto
+# Política per defecte
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 
-# Permitir SSH (crítico — antes de activar)
-sudo ufw allow ssh
+# Permetre SSH (crític — abans d'activar)
+sudo ufw allow 2222/tcp
 
-# Permitir HTTP/HTTPS (Traefik)
+# Permetre HTTP/HTTPS (Traefik)
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 
@@ -38,29 +38,29 @@ sudo ufw enable
 sudo ufw status verbose
 ```
 
-> ⚠️ Asegúrate de que SSH funciona antes de cerrar la sesión actual.
+> Assegura't que SSH funciona abans de tancar la sessió actual.
 
 ---
 
-## 6.2 Certificados TLS locales con mkcert
+## 6.2 Certificats TLS locals amb mkcert
 
-Para HTTPS en `*.devops.lab` sin errores de navegador:
+Per a HTTPS a `*.devops.lab` sense errors de navegador:
 
 ```bash
-# Instalar mkcert en el Mac
+# Instal·lar mkcert al Mac
 brew install mkcert
-mkcert -install   # Instala CA en el keychain del Mac
+mkcert -install   # Instal·la CA al keychain del Mac
 
-# Generar certificado wildcard
+# Generar certificat wildcard
 mkcert "*.devops.lab" devops.lab
 
 # Copiar al servidor
-scp _wildcard.devops.lab+1.pem _wildcard.devops.lab+1-key.pem devops-lab:/opt/lab/traefik/certs/
+scp _wildcard.devops.lab+1.pem _wildcard.devops.lab+1-key.pem devops-lab:/opt/devops/traefik/certs/
 ```
 
-### Actualizar Traefik para usar TLS
+### Actualitzar Traefik per usar TLS
 
-Editar `/opt/lab/traefik/config/dynamic.yml`:
+Editar `/opt/devops/traefik/config/dynamic.yml`:
 
 ```yaml
 tls:
@@ -74,7 +74,7 @@ tls:
         keyFile: /certs/_wildcard.devops.lab+1-key.pem
 ```
 
-Actualizar routers en cada `docker-compose.yml` para usar `websecure`:
+Actualitzar routers a cada `docker-compose.yml` per usar `websecure`:
 
 ```yaml
 labels:
@@ -86,7 +86,7 @@ labels:
   - "traefik.http.routers.gitea-http.middlewares=redirect-to-https"
 ```
 
-Middleware de redirección en `dynamic.yml`:
+Middleware de redirecció a `dynamic.yml`:
 
 ```yaml
 http:
@@ -99,10 +99,10 @@ http:
 
 ---
 
-## 6.3 Cambiar contraseñas por defecto
+## 6.3 Canviar contrasenyes per defecte
 
 ```bash
-# Checklist de contraseñas a cambiar:
+# Checklist de contrasenyes a canviar:
 # [ ] Keycloak admin
 # [ ] Harbor admin
 # [ ] Grafana admin
@@ -110,21 +110,21 @@ http:
 # [ ] Gitea admin
 ```
 
-> Actualizar también los `docker-compose.yml` y ficheros `.env` correspondientes.
+> Actualitzar també els `docker-compose.yml` i fitxers `.env` corresponents.
 
 ---
 
-## 6.4 Usar ficheros .env para secretos
+## 6.4 Usar fitxers .env per a secrets
 
-Ejemplo para cualquier servicio:
+Exemple per a qualsevol servei:
 
 ```bash
-cat > /opt/lab/gitea/.env <<'EOF'
+cat > /opt/devops/gitea/.env <<'EOF'
 GITEA_ADMIN_USER=admin
-GITEA_ADMIN_PASSWORD=<contraseña_segura>
+GITEA_ADMIN_PASSWORD=<contrasenya_segura>
 EOF
 
-chmod 600 /opt/lab/gitea/.env
+chmod 600 /opt/devops/gitea/.env
 ```
 
 En `docker-compose.yml`:
@@ -133,33 +133,33 @@ env_file:
   - .env
 ```
 
-> ⚠️ Añadir `**/.env` al `.gitignore` del repositorio.
+> Afegir `**/.env` al `.gitignore` del repositori.
 
 ---
 
-## 6.5 Restricciones Docker
+## 6.5 Restriccions Docker
 
 ```bash
-# Ver contenedores que corren como root
+# Veure contenidors que s'executen com a root
 docker ps -q | xargs docker inspect --format '{{.Name}}: User={{.Config.User}}'
 
-# Auditar volúmenes con acceso al socket Docker
+# Auditar volums amb accés al socket Docker
 docker ps -q | xargs docker inspect --format '{{.Name}}: {{.HostConfig.Binds}}'
 ```
 
 ---
 
-## 6.6 .gitignore del repositorio
+## 6.6 .gitignore del repositori
 
 ```bash
-cat > /home/claude/devops-lab/.gitignore <<'EOF'
-# Secretos
+cat > /opt/devops/.gitignore <<'EOF'
+# Secrets
 **/.env
 **/*.key
 **/*.pem
 **/secrets/
 
-# Datos persistentes (no versionar)
+# Dades persistents (no versionar)
 **/data/
 **/certs/
 
@@ -178,30 +178,30 @@ EOF
 ## 6.7 Snapshot final
 
 ```bash
-sudo snapper -c root create --description "post-fase-06-seguridad" --cleanup-algorithm number
+sudo /opt/devops/snapshots/snapshot.sh post-fase-06-seguritat
 ```
 
 ---
 
-## Notas y observaciones
+## Notes i observacions
 
-| Fecha | Nota |
-|-------|------|
+| Data | Nota |
+|------|------|
 | | |
 
 ---
 
 ## Checklist de fase completada
 
-- [ ] UFW configurado y activo
-- [ ] SSH funciona tras activar UFW
-- [ ] mkcert instalado en Mac, CA en keychain
-- [ ] Certificado wildcard generado y copiado al servidor
-- [ ] Traefik usando HTTPS en todos los servicios
-- [ ] Redirección HTTP → HTTPS activa
-- [ ] Todas las contraseñas por defecto cambiadas
-- [ ] Secretos movidos a ficheros `.env`
-- [ ] `.gitignore` configurado
-- [ ] Snapshot "post-fase-06" creado
+- [ ] UFW configurat i actiu
+- [ ] SSH funciona després d'activar UFW (port 2222)
+- [ ] mkcert instal·lat al Mac, CA al keychain
+- [ ] Certificat wildcard generat i copiat al servidor
+- [ ] Traefik usant HTTPS a tots els serveis
+- [ ] Redirecció HTTP → HTTPS activa
+- [ ] Totes les contrasenyes per defecte canviades
+- [ ] Secrets moguts a fitxers `.env`
+- [ ] `.gitignore` configurat
+- [ ] Snapshot "post-fase-06" creat
 
-**Siguiente fase**: [Fase 07 — Backup y recuperación](../fase-07-backup/README.md)
+**Fase següent**: [Fase 07 — Backup i recuperació](../fase-07-backup/README.md)

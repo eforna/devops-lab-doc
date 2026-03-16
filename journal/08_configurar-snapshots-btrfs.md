@@ -31,7 +31,8 @@ sudo btrfs subvolume list /mnt/btrfs-data
 ## Pas 2 — Script de snapshots
 
 ```bash
-sudo tee /opt/devops/snapshot.sh > /dev/null << 'EOF'
+sudo tee /opt/devops/snapshots/snapshot.sh > /dev/null << 'EOF'
+# NOTA: Aquest script es troba al repo it12-devops a opt/devops/snapshots/snapshot.sh
 #!/bin/bash
 
 DATE=$(date +%Y%m%d_%H%M%S)
@@ -64,7 +65,7 @@ echo "Snapshot completat: ${DATE}" | tee -a $LOG_FILE
 echo "========================================" | tee -a $LOG_FILE
 EOF
 
-sudo chmod +x /opt/devops/snapshot.sh
+sudo chmod +x /opt/devops/snapshots/snapshot.sh
 ```
 
 ---
@@ -73,7 +74,7 @@ sudo chmod +x /opt/devops/snapshot.sh
 
 ```bash
 # Executar snapshot
-sudo /opt/devops/snapshot.sh
+sudo /opt/devops/snapshots/snapshot.sh
 
 # Verificar snapshots creats
 sudo btrfs subvolume list /mnt/btrfs-snapshots
@@ -95,13 +96,13 @@ Afegir les línies següents:
 
 ```
 # Snapshot diari a la 01:00
-0 1 * * * /opt/devops/snapshot.sh
+0 1 * * * /opt/devops/snapshots/snapshot.sh
 
 # Backup setmanal (diumenge) a les 02:00
-0 2 * * 0 /opt/devops/backup.sh
+0 2 * * 0 /opt/devops/backup/backup.sh
 
 # Backup snapshots diari a les 03:00
-0 3 * * * /opt/devops/backup_snapshots.sh
+0 3 * * * /opt/devops/backup/backup_snapshots.sh
 ```
 
 ---
@@ -109,7 +110,7 @@ Afegir les línies següents:
 ## Pas 5 — Script de restauració de snapshot
 
 ```bash
-sudo tee /opt/devops/restore-snapshot.sh > /dev/null << 'EOF'
+sudo tee /opt/devops/snapshots/restore-snapshot.sh > /dev/null << 'EOF'
 #!/bin/bash
 
 echo "Snapshots disponibles:"
@@ -153,7 +154,7 @@ echo "Restauració completada!"
 echo "Verificar: docker compose ps"
 EOF
 
-sudo chmod +x /opt/devops/restore-snapshot.sh
+sudo chmod +x /opt/devops/snapshots/restore-snapshot.sh
 ```
 
 ---
@@ -163,7 +164,7 @@ sudo chmod +x /opt/devops/restore-snapshot.sh
 | Pas | Tasca | Estat |
 |-----|-------|-------|
 | 1 | Directori `/mnt/btrfs-snapshots` creat | ✅ |
-| 2 | Script `/opt/devops/snapshot.sh` creat | ✅ |
+| 2 | Script `/opt/devops/snapshots/snapshot.sh` creat | ✅ |
 | 3 | Snapshot de prova executat | ✅ |
 | 4 | Cron configurat (diari 01:00) | ✅ |
-| 5 | Script `/opt/devops/restore-snapshot.sh` creat | ✅ |
+| 5 | Script `/opt/devops/snapshots/restore-snapshot.sh` creat | ✅ |

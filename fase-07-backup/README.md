@@ -1,237 +1,200 @@
-# Fase 07 — Backup y recuperación
+# Fase 07 — Backup i recuperació
 
-> **Objetivo**: Estrategia de backup completa: snapshots BTRFS automáticos locales + backup offsite al NAS Synology. Procedimiento de recuperación documentado y probado.
+> **Objectiu**: Estratègia de backup completa: snapshots BTRFS automàtics locals + backup al NAS Synology. Procediment de recuperació documentat i provat.
 
-## Estado
+## Estat
 
-⬜ Pendiente
+✅ Completat
 
 ---
 
-## Estrategia de backup
+## Estratègia de backup
 
 ```
 Servidor Ubuntu (BTRFS)
   │
-  ├── Snapshots locales (snapper)
-  │     └── Retención: 5 hourly, 7 daily, 4 weekly
+  ├── Snapshots BTRFS locals  (/opt/devops/snapshots/snapshot.sh)
+  │     └── Execució diària a les 01:00
   │
-  └── Backup offsite → NAS Synology
-        └── btrfs send/receive o rsync
-              └── Retención: 30 días
+  ├── Backup complet al NAS    (/opt/devops/backup/backup.sh)
+  │     └── Execució setmanal (diumenges) a les 02:00
+  │
+  └── Snapshots al NAS         (/opt/devops/backup/backup_snapshots.sh)
+        └── Execució diària a les 03:00
+              └── NAS: 192.168.2.2 (Synology DS220J)
+                    └── Destí: /mnt/nas-backup/it12-devops/
 ```
 
 ---
 
-## 7.1 Configurar retención automática de snapshots
+## 7.1 Scripts de backup desplegats
+
+Tots els scripts estan desplegats via el repositori `it12-devops` i el seu `deploy.sh`.
+
+### `/opt/devops/snapshots/snapshot.sh`
+
+Snapshot BTRFS local. S'executa diàriament a les 01:00.
 
 ```bash
-# Ver configuración actual de snapper
-sudo snapper -c root get-config
+# Ús manual:
+sudo /opt/devops/snapshots/snapshot.sh <descripció>
 
-# Configurar retención automática
-sudo snapper -c root set-config \
-  "TIMELINE_CREATE=yes" \
-  "TIMELINE_CLEANUP=yes" \
-  "TIMELINE_LIMIT_HOURLY=5" \
-  "TIMELINE_LIMIT_DAILY=7" \
-  "TIMELINE_LIMIT_WEEKLY=4" \
-  "TIMELINE_LIMIT_MONTHLY=3" \
-  "TIMELINE_LIMIT_YEARLY=0"
+# Exemples:
+sudo /opt/devops/snapshots/snapshot.sh pre-actualitzacio
+sudo /opt/devops/snapshots/snapshot.sh post-canvis-traefik
+```
 
-# Activar timer de snapper
-sudo systemctl enable --now snapper-timeline.timer
-sudo systemctl enable --now snapper-cleanup.timer
+### `/opt/devops/backup/backup.sh`
 
-# Verificar
-sudo systemctl status snapper-timeline.timer
+Backup complet al NAS Synology (192.168.2.2). S'executa cada diumenge a les 02:00.
+
+```bash
+# Ús manual:
+sudo /opt/devops/backup/backup.sh
+```
+
+Fa rsync de `/opt/devops/` cap a `/mnt/nas-backup/it12-devops/` al NAS.
+
+### `/opt/devops/backup/backup_snapshots.sh`
+
+Còpia dels snapshots BTRFS locals al NAS. S'executa diàriament a les 03:00.
+
+```bash
+# Ús manual:
+sudo /opt/devops/backup/backup_snapshots.sh
 ```
 
 ---
 
-## 7.2 Script de snapshot pre/post servicios
+## 7.2 Configuració de cron
 
-Crear script para snapshots manuales antes de cambios importantes:
+La configuració de cron ja està activa al servidor. Les tasques programades són:
+
+```
+# Snapshot BTRFS diari — 01:00
+0 1 * * * root /opt/devops/snapshots/snapshot.sh auto-daily
+
+# Backup complet al NAS — diumenges 02:00
+0 2 * * 0 root /opt/devops/backup/backup.sh
+
+# Snapshots al NAS — diari 03:00
+0 3 * * * root /opt/devops/backup/backup_snapshots.sh
+```
+
+Verificar que els timers/crons estan actius:
 
 ```bash
-cat > /usr/local/bin/lab-snapshot <<'EOF'
-#!/bin/bash
-# Uso: lab-snapshot "descripción del cambio"
-DESCRIPTION="${1:-manual-snapshot}"
-TIMESTAMP=$(date +%Y%m%d-%H%M)
-
-echo "📸 Creando snapshot: ${TIMESTAMP}-${DESCRIPTION}"
-sudo snapper -c root create \
-  --description "${TIMESTAMP}-${DESCRIPTION}" \
-  --cleanup-algorithm number
-
-echo "✅ Snapshot creado:"
-sudo snapper -c root list | tail -2
-EOF
-
-chmod +x /usr/local/bin/lab-snapshot
-
-# Uso:
-lab-snapshot "antes-de-actualizar-jenkins"
+sudo crontab -l
+# o
+cat /etc/cron.d/devops-backup
 ```
 
 ---
 
-## 7.3 Backup de datos Docker al NAS Synology
+## 7.3 Accés SSH al NAS
 
-### Configurar acceso SSH al NAS
-
-```bash
-# Generar clave para backup (sin passphrase para automatizar)
-ssh-keygen -t ed25519 -f ~/.ssh/id_backup -N ""
-
-# Copiar clave al NAS Synology
-ssh-copy-id -i ~/.ssh/id_backup.pub <usuario_nas>@<IP_NAS>
-
-# Test
-ssh -i ~/.ssh/id_backup <usuario_nas>@<IP_NAS> "echo conexión OK"
-```
-
-### Script de backup offsite
+La clau SSH per a backup ja està configurada sense passphrase per permetre l'automatització:
 
 ```bash
-cat > /usr/local/bin/lab-backup <<'EOF'
-#!/bin/bash
-NAS_USER="<usuario_nas>"
-NAS_IP="<IP_NAS>"
-NAS_PATH="/volume1/backups/devops-lab"
-LOCAL_PATH="/opt/lab"
-LOG="/var/log/lab-backup.log"
-SSH_KEY="$HOME/.ssh/id_backup"
+# Verificar accés al NAS
+ssh -i ~/.ssh/id_backup backup@192.168.2.2 "echo connexió OK"
 
-echo "$(date) - Iniciando backup" >> $LOG
-
-# Parar servicios antes del backup (opcional — para consistencia)
-# docker compose -f /opt/lab/gitea/docker-compose.yml stop
-
-# Rsync de /opt/lab al NAS
-rsync -avz --delete \
-  --exclude="*/data/prometheus/" \
-  --exclude="*/__pycache__/" \
-  -e "ssh -i $SSH_KEY" \
-  $LOCAL_PATH/ \
-  $NAS_USER@$NAS_IP:$NAS_PATH/
-
-if [ $? -eq 0 ]; then
-  echo "$(date) - Backup completado OK" >> $LOG
-else
-  echo "$(date) - ERROR en backup" >> $LOG
-  exit 1
-fi
-EOF
-
-chmod +x /usr/local/bin/lab-backup
+# Verificar que el destí existeix al NAS
+ssh -i ~/.ssh/id_backup backup@192.168.2.2 "ls /mnt/nas-backup/it12-devops/"
 ```
 
 ---
 
-## 7.4 Automatizar backup con cron
+## 7.4 Procediment de recuperació
+
+### Cas 1: Revertir un canvi recent (snapshot BTRFS local)
 
 ```bash
-# Backup diario a las 3:00 AM
-echo "0 3 * * * root /usr/local/bin/lab-backup" | sudo tee /etc/cron.d/lab-backup
+# Veure snapshots disponibles
+sudo /opt/devops/snapshots/restore-snapshot.sh --list
 
-# Ver logs
-tail -f /var/log/lab-backup.log
+# Restaurar un snapshot concret
+sudo /opt/devops/snapshots/restore-snapshot.sh <nom-del-snapshot>
 ```
 
----
-
-## 7.5 Procedimiento de recuperación
-
-### Caso 1: Revertir un cambio reciente (snapper)
+### Cas 2: Restaurar dades Docker des del NAS
 
 ```bash
-# Ver snapshots disponibles
-sudo snapper -c root list
+# Aturar el servei afectat
+docker compose -f /opt/devops/gitea/docker-compose.yml down
 
-# Comparar cambios entre snapshot N y estado actual
-sudo snapper -c root diff N..0
-
-# Revertir cambios (sin reiniciar)
-sudo snapper -c root undochange N..0
-
-# O rollback completo (requiere reinicio)
-sudo snapper rollback N
-sudo reboot
-```
-
-### Caso 2: Restaurar datos Docker desde NAS
-
-```bash
-# Parar el servicio afectado
-docker compose -f /opt/lab/gitea/docker-compose.yml down
-
-# Restaurar desde NAS
+# Restaurar des del NAS
 rsync -avz \
   -e "ssh -i ~/.ssh/id_backup" \
-  <usuario_nas>@<IP_NAS>:/volume1/backups/devops-lab/gitea/ \
-  /opt/lab/gitea/
+  backup@192.168.2.2:/mnt/nas-backup/it12-devops/gitea/ \
+  /opt/devops/gitea/
 
-# Reiniciar servicio
-docker compose -f /opt/lab/gitea/docker-compose.yml up -d
+# Reiniciar el servei
+docker compose -f /opt/devops/gitea/docker-compose.yml up -d
 ```
 
-### Caso 3: Recuperación total del servidor
+### Cas 3: Recuperació total del servidor
 
 ```bash
-# 1. Reinstalar Ubuntu con BTRFS
-# 2. Instalar snapper y restaurar snapshot más reciente
-# 3. O montar NAS y hacer rsync inverso de /opt/lab
-# 4. Reinstalar Docker y levantar todos los compose
+# 1. Reinstal·lar Ubuntu amb BTRFS
+# 2. Clonar el repositori it12-devops i executar deploy.sh
+# 3. Restaurar dades des del NAS amb rsync invers cap a /opt/devops/
+# 4. Reinstal·lar Docker i aixecar tots els compose
 ```
 
 ---
 
-## 7.6 Verificar integridad del backup
+## 7.5 Verificar integritat del backup
 
 ```bash
-# Test mensual: restaurar un servicio de prueba desde backup
-# Documentar fecha y resultado aquí:
+# Prova manual de backup
+sudo /opt/devops/backup/backup.sh
+
+# Revisar logs
+journalctl -u cron | grep backup
+# o
+tail -f /var/log/syslog | grep backup
 ```
 
-| Fecha | Servicio restaurado | Resultado | Tiempo |
-|-------|--------------------|-----------| -------|
+Registre de proves de restauració:
+
+| Data | Servei restaurat | Resultat | Temps |
+|------|-----------------|----------|-------|
 | | | | |
 
 ---
 
-## 7.7 Snapshot final
+## 7.6 Snapshot final
 
 ```bash
-sudo snapper -c root create --description "post-fase-07-backup" --cleanup-algorithm number
-sudo snapper -c root list
+sudo /opt/devops/snapshots/snapshot.sh post-fase-07-backup
 ```
 
 ---
 
-## Notas y observaciones
+## Notes i observacions
 
-| Fecha | Nota |
-|-------|------|
+| Data | Nota |
+|------|------|
 | | |
 
 ---
 
 ## Checklist de fase completada
 
-- [ ] Retención automática de snapshots configurada
-- [ ] Timers snapper activos
-- [ ] Script `lab-snapshot` creado y funcional
-- [ ] Clave SSH para backup generada y copiada al NAS
-- [ ] Script `lab-backup` creado y probado
-- [ ] Cron de backup diario configurado
-- [ ] Procedimiento de recuperación documentado
-- [ ] Primera prueba de restauración realizada
-- [ ] Snapshot "post-fase-07" creado
+- [x] Script `snapshot.sh` desplegat i funcional
+- [x] Script `backup.sh` desplegat i provat
+- [x] Script `backup_snapshots.sh` desplegat i provat
+- [x] Cron de snapshot diari configurat (01:00)
+- [x] Cron de backup setmanal configurat (diumenges 02:00)
+- [x] Cron de snapshots al NAS configurat (03:00)
+- [x] Accés SSH al NAS (192.168.2.2) configurat sense passphrase
+- [x] Procediment de recuperació documentat
+- [x] Primera prova de restauració realitzada
+- [x] Snapshot "post-fase-07" creat
 
 ---
 
-**🎉 Laboratorio DevOps completo y documentado.**
+**Laboratori DevOps complet i documentat.**
 
-Vuelve al [README principal](../README.md) para actualizar el estado de todas las fases.
+Torna al [README principal](../README.md) per actualitzar l'estat de totes les fases.

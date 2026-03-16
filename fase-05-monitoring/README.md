@@ -1,43 +1,43 @@
-# Fase 05 — Monitorización: Prometheus + Grafana
+# Fase 05 — Monitorització: Prometheus + Grafana
 
-> **Objetivo**: Stack de observabilidad completo: métricas del servidor, Docker y todos los servicios del lab visibles en dashboards Grafana.  
-> **Prerrequisito**: [Fase 04](../fase-04-registry/README.md) completada.
+> **Objectiu**: Stack d'observabilitat complet: mètriques del servidor, Docker i tots els serveis del lab visibles en dashboards Grafana.
+> **Prerequisit**: [Fase 04](../fase-04-registry/README.md) completada.
 
-## Estado
+## Estat
 
-⬜ Pendiente
+✅ Completat
 
 ---
 
-## Snapshot antes de empezar
+## Snapshot abans de començar
 
 ```bash
-sudo snapper -c root create --description "pre-fase-05-monitoring" --cleanup-algorithm number
+sudo /opt/devops/snapshots/snapshot.sh pre-fase-05-monitoring
 ```
 
 ---
 
-## Arquitectura de monitorización
+## Arquitectura de monitorització
 
 ```
 Servidor Ubuntu
-  ├── node_exporter      → métricas sistema (CPU, RAM, disco)
-  └── cAdvisor           → métricas Docker/contenedores
+  ├── node_exporter      → mètriques sistema (CPU, RAM, disc)
+  └── cAdvisor           → mètriques Docker/contenidors
          ↓
-      Prometheus         → recoge y almacena métricas
+      Prometheus         → recull i emmagatzema mètriques
          ↓
-       Grafana           → dashboards y alertas
+       Grafana           → dashboards i alertes
 ```
 
 ---
 
-## 5.1 Estructura de ficheros
+## 5.1 Estructura de fitxers
 
 ```bash
-mkdir -p /opt/lab/monitoring/{prometheus,grafana}
-mkdir -p /opt/lab/monitoring/prometheus/data
-mkdir -p /opt/lab/monitoring/grafana/data
-sudo chown -R 472:472 /opt/lab/monitoring/grafana/data  # UID de Grafana
+mkdir -p /opt/devops/grafana/{prometheus,grafana}
+mkdir -p /opt/devops/grafana/prometheus/data
+mkdir -p /opt/devops/grafana/grafana/data
+sudo chown -R 472:472 /opt/devops/grafana/grafana/data  # UID de Grafana
 ```
 
 ---
@@ -45,7 +45,7 @@ sudo chown -R 472:472 /opt/lab/monitoring/grafana/data  # UID de Grafana
 ## 5.2 Configurar Prometheus
 
 ```bash
-cat > /opt/lab/monitoring/prometheus/prometheus.yml <<'EOF'
+cat > /opt/devops/grafana/prometheus/prometheus.yml <<'EOF'
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -57,11 +57,11 @@ scrape_configs:
 
   - job_name: 'node-exporter'
     static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: ['192.168.2.5:9100']
 
   - job_name: 'cadvisor'
     static_configs:
-      - targets: ['cadvisor:8080']
+      - targets: ['192.168.2.5:9323']
 
   - job_name: 'traefik'
     static_configs:
@@ -72,10 +72,10 @@ EOF
 
 ---
 
-## 5.3 Docker Compose del stack
+## 5.3 Docker Compose de l'stack
 
 ```bash
-cat > /opt/lab/monitoring/docker-compose.yml <<'EOF'
+cat > /opt/devops/grafana/docker-compose.yml <<'EOF'
 services:
 
   prometheus:
@@ -84,14 +84,14 @@ services:
     restart: unless-stopped
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/data:/prometheus
+      - /mnt/btrfs-data/prometheus:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
     networks:
-      - lab-net
+      - devops-net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus.rule=Host(`prometheus.devops.lab`)"
@@ -107,9 +107,9 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=changeme_lab
       - GF_SERVER_ROOT_URL=http://grafana.devops.lab
     volumes:
-      - ./grafana/data:/var/lib/grafana
+      - /mnt/btrfs-data/grafana:/var/lib/grafana
     networks:
-      - lab-net
+      - devops-net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.grafana.rule=Host(`grafana.devops.lab`)"
@@ -131,7 +131,7 @@ services:
       - '--path.rootfs=/rootfs'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     networks:
-      - lab-net
+      - devops-net
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -147,44 +147,44 @@ services:
     devices:
       - /dev/kmsg
     networks:
-      - lab-net
+      - devops-net
 
 networks:
-  lab-net:
+  devops-net:
     external: true
 EOF
 ```
 
 ```bash
-cd /opt/lab/monitoring
+cd /opt/devops/grafana
 docker compose up -d
 docker compose ps
 ```
 
 ---
 
-## 5.4 Verificar métricas en Prometheus
+## 5.4 Verificar mètriques a Prometheus
 
-Abrir `http://prometheus.devops.lab`:
+Obrir `http://prometheus.devops.lab`:
 
 ```
-Status → Targets → verificar que todos están UP
+Status → Targets → verificar que tots estan UP
 ```
 
-Consultas de prueba en el explorador:
+Consultes de prova a l'explorador:
 ```
-up                                    # Ver todos los targets
+up                                    # Veure tots els targets
 node_cpu_seconds_total                # CPU del servidor
-container_memory_usage_bytes          # RAM por contenedor
+container_memory_usage_bytes          # RAM per contenidor
 ```
 
 ---
 
 ## 5.5 Configurar Grafana
 
-Abrir `http://grafana.devops.lab` → login `admin` / `changeme_lab`
+Obrir `http://grafana.devops.lab` → login `admin` / `changeme_lab`
 
-### Añadir datasource Prometheus
+### Afegir datasource Prometheus
 
 ```
 Configuration → Data Sources → Add → Prometheus
@@ -192,23 +192,23 @@ Configuration → Data Sources → Add → Prometheus
 → Save & Test
 ```
 
-### Importar dashboards oficiales
+### Importar dashboards oficials
 
 ```
 Dashboards → Import → ID del dashboard
 ```
 
-| Dashboard | ID | Descripción |
-|-----------|----|-------------|
-| Node Exporter Full | `1860` | Métricas completas del servidor |
-| Docker / cAdvisor | `893` | Métricas de contenedores |
-| Traefik | `17346` | Métricas del reverse proxy |
+| Dashboard | ID | Descripció |
+|-----------|----|------------|
+| Node Exporter Full | `1860` | Mètriques completes del servidor |
+| Docker / cAdvisor | `893` | Mètriques de contenidors |
+| Traefik | `17346` | Mètriques del reverse proxy |
 
 ---
 
-## 5.6 Habilitar métricas en Traefik
+## 5.6 Habilitar mètriques a Traefik
 
-Editar `/opt/lab/traefik/traefik.yml` y añadir:
+Editar `/opt/devops/traefik/traefik.yml` i afegir:
 
 ```yaml
 metrics:
@@ -219,7 +219,7 @@ metrics:
 ```
 
 ```bash
-docker compose -f /opt/lab/traefik/docker-compose.yml restart
+docker compose -f /opt/devops/traefik/docker-compose.yml restart
 ```
 
 ---
@@ -227,30 +227,30 @@ docker compose -f /opt/lab/traefik/docker-compose.yml restart
 ## 5.7 Snapshot final
 
 ```bash
-sudo snapper -c root create --description "post-fase-05-monitoring" --cleanup-algorithm number
+sudo /opt/devops/snapshots/snapshot.sh post-fase-05-monitoring
 ```
 
 ---
 
-## Notas y observaciones
+## Notes i observacions
 
-| Fecha | Nota |
-|-------|------|
+| Data | Nota |
+|------|------|
 | | |
 
 ---
 
 ## Checklist de fase completada
 
-- [ ] Prometheus desplegado y accesible
-- [ ] node-exporter corriendo (métricas sistema)
-- [ ] cAdvisor corriendo (métricas Docker)
-- [ ] Todos los targets en Prometheus: estado UP
-- [ ] Grafana desplegado y accesible
-- [ ] Datasource Prometheus configurado en Grafana
-- [ ] Dashboard Node Exporter importado
-- [ ] Dashboard Docker/cAdvisor importado
-- [ ] Métricas Traefik habilitadas
-- [ ] Snapshot "post-fase-05" creado
+- [x] Prometheus desplegat i accessible
+- [x] node-exporter en execució (mètriques sistema)
+- [x] cAdvisor en execució (mètriques Docker)
+- [x] Tots els targets a Prometheus: estat UP
+- [x] Grafana desplegat i accessible
+- [x] Datasource Prometheus configurat a Grafana
+- [x] Dashboard Node Exporter importat
+- [x] Dashboard Docker/cAdvisor importat
+- [x] Mètriques Traefik habilitades
+- [x] Snapshot "post-fase-05" creat
 
-**Siguiente fase**: [Fase 06 — Seguridad y hardening](../fase-06-seguridad/README.md)
+**Fase següent**: [Fase 06 — Seguretat i hardening](../fase-06-seguridad/README.md)

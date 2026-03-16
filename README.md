@@ -1,83 +1,92 @@
-# 🧪 DevOps Lab — Geekom i7
+# DevOps Lab — Geekom IT12
 
-Laboratorio DevOps personal para experimentación, aprendizaje y práctica con herramientas de infraestructura moderna.
+Laboratori DevOps personal per a experimentació, aprenentatge i pràctica amb eines d'infraestructura moderna.
 
 ## Hardware
 
-| Componente | Detalle |
-|------------|---------|
-| Máquina | Geekom IT12 |
+| Component | Detall |
+|-----------|--------|
+| Màquina | Geekom IT12 |
 | CPU | Intel Core i7 |
 | RAM | 32 GB |
-| OS | Ubuntu Server (BTRFS) |
-| Red | LAN local — dominio `devops.lab` |
-| DNS | NAS Synology (DNS primario) |
+| SSD | 1 TB (NVMe) |
+| OS | Ubuntu Server 24.04 LTS (BTRFS) |
+| IP | 192.168.2.5 |
+| Hostname | it12-devops |
+| Usuari | edu |
 
-## Arquitectura de servicios
+## Arquitectura de serveis
 
 ```
-*.devops.lab
+*.devops.lab  (DNS wildcard → 192.168.2.5, NAS Synology 192.168.2.2)
      │
      ▼
-  Traefik (reverse proxy + SSL)
+  Traefik (reverse proxy, port 80/443)   xarxa: devops-net
      │
-     ├── gitea.devops.lab        → Gitea (Git server)
+     ├── gitea.devops.lab        → Gitea + PostgreSQL
      ├── jenkins.devops.lab      → Jenkins (CI/CD)
-     ├── harbor.devops.lab       → Harbor (Container Registry)
+     ├── harbor.devops.lab:8888  → Harbor (Container Registry)
      ├── keycloak.devops.lab     → Keycloak (SSO / IAM)
      ├── portainer.devops.lab    → Portainer (Docker UI)
      ├── grafana.devops.lab      → Grafana (Dashboards)
-     └── prometheus.devops.lab   → Prometheus (Métricas)
+     └── prometheus.devops.lab   → Prometheus (Mètriques)
 ```
 
-## Estructura del repositorio
+## Repositoris del projecte
+
+| Repo | Contingut |
+|------|-----------|
+| [devops-lab-doc](https://github.com/eforna/devops-lab-doc) | Aquest repo — documentació, guies i journal |
+| [it12-devops](https://github.com/eforna/it12-devops) | Fitxers de configuració del servidor (mirror filesystem) |
+
+## Estructura d'aquest repo
 
 ```
-devops-lab/
-├── README.md                       ← Este fichero
-├── fase-00-base/                   ← Sistema base, SSH, BTRFS, snapshots
-├── fase-01-infraestructura/        ← Docker, redes, Traefik
-├── fase-02-servicios-core/         ← Gitea, Portainer, Keycloak
-├── fase-03-ci-cd/                  ← Jenkins
-├── fase-04-registry/               ← Harbor
-├── fase-05-monitoring/             ← Prometheus + Grafana
-├── fase-06-seguridad/              ← Hardening, firewall, certificados
-└── fase-07-backup/                 ← Estrategia BTRFS + offsite NAS
+devops-lab-doc/
+├── README.md
+├── REFERENCIA-RAPIDA.md
+├── docs/
+│   ├── arquitectura.md          ← visió global del projecte
+│   └── ubuntu/                  ← referència filesystem Ubuntu
+├── journal/                     ← notes reals de cada sessió de treball
+│   ├── 01_copia-seguretat-usb.md
+│   ├── 02_installacio-ubuntu-server.md
+│   └── ...
+├── fase-00-base/                ← guia: sistema base, SSH, BTRFS
+├── fase-01-infraestructura/     ← guia: Docker, xarxa, Traefik
+├── fase-02-servicios-core/      ← guia: Gitea, Portainer, Keycloak
+├── fase-03-ci-cd/               ← guia: Jenkins
+├── fase-04-registry/            ← guia: Harbor
+├── fase-05-monitoring/          ← guia: Prometheus + Grafana
+├── fase-06-seguridad/           ← guia: Hardening, TLS
+└── fase-07-backup/              ← guia: BTRFS snapshots + NAS
 ```
 
-## Estado del proyecto
+## Estat del projecte
 
-| Fase | Descripción | Estado |
-|------|-------------|--------|
-| 00 | Sistema base | ⬜ Pendiente |
-| 01 | Infraestructura Docker + Traefik | ⬜ Pendiente |
-| 02 | Servicios core (Gitea, Portainer, Keycloak) | ⬜ Pendiente |
-| 03 | CI/CD con Jenkins | ⬜ Pendiente |
-| 04 | Registry con Harbor | ⬜ Pendiente |
-| 05 | Monitorización | ⬜ Pendiente |
-| 06 | Seguridad y hardening | ⬜ Pendiente |
-| 07 | Backup y recuperación | ⬜ Pendiente |
+| Fase | Descripció | Estat |
+|------|------------|-------|
+| 00 | Sistema base, BTRFS, SSH | ✅ Completat |
+| 01 | Docker + Traefik + DNS | ✅ Completat |
+| 02 | Gitea, Portainer, Keycloak | ✅ Completat |
+| 03 | Jenkins CI/CD | ✅ Completat |
+| 04 | Harbor registry | ✅ Completat |
+| 05 | Prometheus + Grafana | ✅ Completat |
+| 06 | Seguretat — HTTPS/TLS | 🔄 En progres |
+| 07 | Backup BTRFS + NAS | ✅ Completat |
 
-> Actualiza el estado con: ✅ Completado · 🔄 En progreso · ⚠️ Con incidencias · ⬜ Pendiente
+> ✅ Completat · 🔄 En progrés · ⚠️ Amb incidències · ⬜ Pendent
 
-## Entorno de trabajo
+## Entorn de treball
 
-- **Workstation**: macOS
+- **Workstation**: MacBook Air M3
 - **Editor**: Visual Studio Code
 - **Git GUI**: Fork / SourceTree
-- **Acceso servidor**: SSH
+- **Accés servidor**: SSH (`ssh edu@192.168.2.5 -p 2222`)
 
-## Convenciones
+## Convencions
 
-- Cada fase tiene su propio `README.md` con contexto, comandos y notas
-- Los comandos se ejecutan directamente en el servidor y se documentan después
-- Los snapshots BTRFS se crean **antes** de cada fase como punto de control
-- Las variables de entorno sensibles van en ficheros `.env` (nunca en Git)
-
-## Variables globales del laboratorio
-
-```bash
-LAB_DOMAIN="devops.lab"
-LAB_IP="<IP_DEL_SERVIDOR>"       # Rellenar tras instalación
-LAB_USER="<TU_USUARIO>"          # Usuario no-root del servidor
-```
+- Cada fase té el seu `README.md` amb context, comandos i notes
+- El `journal/` recull les notes reals de cada sessió (incidències, canvis, decisions)
+- Els snapshots BTRFS es creen **abans** de cada canvi important al servidor
+- Les credencials van al `.env` del servidor — mai al repo

@@ -3,11 +3,11 @@
 ## Arquitectura
 
 ```
-IT12-DEVOPS (192.168.1.5)
+IT12-DEVOPS (192.168.2.5)
         │
         │ NFS mount
         ▼
-NAS Synology DS220J (192.168.1.2)
+NAS Synology DS220J (192.168.2.2)
         │
         └── /volume1/backup/it12-devops/
             ├── docker-configs/
@@ -29,7 +29,7 @@ DSM → Control Panel → File Services
 DSM → Control Panel → Shared Folders
   → Carpeta: "backup"
   → NFS Permissions → Create:
-      Hostname/IP:  192.168.1.5
+      Hostname/IP:  192.168.2.5
       Privilege:    Read/Write
       Squash:       No mapping
       Security:     sys
@@ -49,7 +49,7 @@ sudo apt install -y nfs-common cifs-utils
 sudo mkdir -p /mnt/nas-backup
 
 # Verificar que el NAS exporta la carpeta
-showmount -e 192.168.1.2
+showmount -e 192.168.2.2
 ```
 
 ---
@@ -58,7 +58,7 @@ showmount -e 192.168.1.2
 
 ```bash
 # Provar muntatge manual
-sudo mount -t nfs 192.168.1.2:/volume1/backup /mnt/nas-backup
+sudo mount -t nfs 192.168.2.2:/volume1/backup /mnt/nas-backup
 
 # Verificar
 df -h | grep nas
@@ -80,7 +80,7 @@ Afegir al final:
 
 ```
 # NAS Synology - Backup
-192.168.1.2:/volume1/backup  /mnt/nas-backup  nfs  defaults,_netdev,auto  0  0
+192.168.2.2:/volume1/backup  /mnt/nas-backup  nfs  defaults,_netdev,auto  0  0
 ```
 
 ```bash
@@ -96,11 +96,11 @@ df -h | grep nas
 
 ## Pas 5 — Script de backup
 
-El script definitiu es troba a `/opt/devops/backup.sh`.
+El script definitiu es troba a `/opt/devops/backup/backup.sh`.
 Veure document [10_optimitzacio backups] per la versió final actualitzada.
 
 ```bash
-sudo tee /opt/devops/backup.sh > /dev/null << 'EOF'
+sudo tee /opt/devops/backup/backup.sh > /dev/null << 'EOF'
 #!/bin/bash
 
 DATE=$(date +%Y%m%d_%H%M%S)
@@ -144,7 +144,7 @@ echo "Espai total: $(du -sh ${BACKUP_DIR})" | tee -a $LOG_FILE
 echo "========================================" | tee -a $LOG_FILE
 EOF
 
-sudo chmod +x /opt/devops/backup.sh
+sudo chmod +x /opt/devops/backup/backup.sh
 ```
 
 ---
@@ -153,7 +153,7 @@ sudo chmod +x /opt/devops/backup.sh
 
 ```bash
 # Executar
-sudo /opt/devops/backup.sh
+sudo /opt/devops/backup/backup.sh
 
 # Seguir el progrés en temps real
 tail -f /var/log/backup-it12.log
@@ -175,13 +175,13 @@ sudo crontab -e
 
 ```
 # Snapshot BTRFS diari a les 01:00
-0 1 * * * /opt/devops/snapshot.sh
+0 1 * * * /opt/devops/snapshots/snapshot.sh
 
 # Backup complet setmanal (diumenge) a les 02:00
-0 2 * * 0 /opt/devops/backup.sh
+0 2 * * 0 /opt/devops/backup/backup.sh
 
 # Backup snapshots diari a les 03:00
-0 3 * * * /opt/devops/backup_snapshots.sh
+0 3 * * * /opt/devops/backup/backup_snapshots.sh
 ```
 
 ---
@@ -207,5 +207,5 @@ sudo crontab -e
 | 1 | NFS configurat al Synology | ✅ |
 | 2 | NAS muntat a `/mnt/nas-backup` | ✅ |
 | 3 | `fstab` configurat | ✅ |
-| 4 | Script `/opt/devops/backup.sh` | ✅ |
+| 4 | Script `/opt/devops/backup/backup.sh` | ✅ |
 | 5 | Cron configurat | ✅ |
