@@ -52,28 +52,36 @@ devops-lab-doc/
 │   ├── 01_copia-seguretat-usb.md
 │   ├── 02_installacio-ubuntu-server.md
 │   └── ...
-├── fase-00-base/                ← guia: sistema base, SSH, BTRFS
-├── fase-01-infraestructura/     ← guia: Docker, xarxa, Traefik
-├── fase-02-servicios-core/      ← guia: Gitea, Portainer, Keycloak
-├── fase-03-ci-cd/               ← guia: Jenkins
-├── fase-04-registry/            ← guia: Harbor
-├── fase-05-monitoring/          ← guia: Prometheus + Grafana
-├── fase-06-seguridad/           ← guia: Hardening, TLS
-└── fase-07-backup/              ← guia: BTRFS snapshots + NAS
+├── infraestructura/             ← posada en marxa del servidor
+│   ├── base/                    ← Ubuntu Server, BTRFS, SSH
+│   ├── docker-traefik/          ← Docker Engine, xarxa, Traefik
+│   └── backup/                  ← Snapshots BTRFS + NAS Synology
+├── serveis/                     ← documentació per servei
+│   ├── gitea/
+│   ├── portainer/
+│   ├── keycloak/
+│   ├── jenkins/
+│   ├── harbor/
+│   ├── grafana/
+│   └── prometheus/
+└── seguretat/                   ← hardening, TLS, contrasenyes
 ```
 
 ## Estat del projecte
 
-| Fase | Descripció | Estat |
+| Àrea | Descripció | Estat |
 |------|------------|-------|
-| 00 | Sistema base, BTRFS, SSH | ✅ Completat |
-| 01 | Docker + Traefik + DNS | ✅ Completat |
-| 02 | Gitea, Portainer, Keycloak | ✅ Completat |
-| 03 | Jenkins CI/CD | ✅ Completat |
-| 04 | Harbor registry | ✅ Completat |
-| 05 | Prometheus + Grafana | ✅ Completat |
-| 06 | Seguretat — HTTPS/TLS | 🔄 En progres |
-| 07 | Backup BTRFS + NAS | ✅ Completat |
+| [infraestructura/base](infraestructura/base/README.md) | Ubuntu Server, BTRFS, SSH | ✅ Completat |
+| [infraestructura/docker-traefik](infraestructura/docker-traefik/README.md) | Docker + Traefik + DNS | ✅ Completat |
+| [infraestructura/backup](infraestructura/backup/README.md) | BTRFS snapshots + NAS | ✅ Completat |
+| [serveis/gitea](serveis/gitea/README.md) | Servidor Git | ✅ Completat |
+| [serveis/portainer](serveis/portainer/README.md) | Docker UI | ✅ Completat |
+| [serveis/keycloak](serveis/keycloak/README.md) | SSO / IAM | ✅ Completat |
+| [serveis/jenkins](serveis/jenkins/README.md) | CI/CD | ✅ Completat |
+| [serveis/harbor](serveis/harbor/README.md) | Container Registry | ✅ Completat |
+| [serveis/grafana](serveis/grafana/README.md) | Dashboards | ✅ Completat |
+| [serveis/prometheus](serveis/prometheus/README.md) | Mètriques | ✅ Completat |
+| [seguretat](seguretat/README.md) | Hardening, HTTPS/TLS | 🔄 En progrés |
 
 > ✅ Completat · 🔄 En progrés · ⚠️ Amb incidències · ⬜ Pendent
 
